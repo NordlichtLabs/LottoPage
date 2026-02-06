@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoLotto - Blockchain Lottery Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital@0;1&display=swap');
+        
+        .font-serif {
+            font-family: 'Playfair Display', serif;
+        }
+        
+        body {
+            background: #0a0a0f;
+        }
+        
+        .glow-purple {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(147, 51, 234, 0.3) 0%, transparent 70%);
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .glow-blue {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%);
+            filter: blur(60px);
+            pointer-events: none;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body class="text-white">
+    <div id="app"></div>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function CryptoLotto() {
+            const [balance, setBalance] = useState(100.00);
+            const [activeBets, setActiveBets] = useState([]);
+            const [selectedBet, setSelectedBet] = useState(null);
+            const [betAmount, setBetAmount] = useState(1.00);
+            const [countdown, setCountdown] = useState({ hours: 3, minutes: 24, seconds: 0 });
+
+            const lotteries = [
+                {
+                    id: 'de',
+                    name: 'Germany 6/49',
+                    country: 'DE',
+                    flag: '🇩🇪',
+                    initialTime: { hours: 3, minutes: 24, seconds: 0 },
+                    frequency: 'Wed & Sat',
+                    jackpot: '€12.4M'
+                },
+                {
+                    id: 'us',
+                    name: 'US Powerball',
+                    country: 'US',
+                    flag: '🇺🇸',
+                    initialTime: { hours: 12, minutes: 15, seconds: 30 },
+                    frequency: 'Mon, Wed & Sat',
+                    jackpot: '$47.2M'
+                },
+                {
+                    id: 'uk',
+                    name: 'UK National',
+                    country: 'UK',
+                    flag: '🇬🇧',
+                    initialTime: { hours: 50, minutes: 0, seconds: 0 },
+                    frequency: 'Wed & Sat',
+                    jackpot: '£8.9M'
+                }
+            ];
+
+            const [lotteryCountdowns, setLotteryCountdowns] = useState(() => {
+                const initial = {};
+                lotteries.forEach(lottery => {
+                    initial[lottery.id] = { ...lottery.initialTime };
+                });
+                return initial;
+            });
+
+            // Main countdown timer
+            useEffect(() => {
+                const timer = setInterval(() => {
+                    setCountdown(prev => {
+                        let { hours, minutes, seconds } = prev;
+                        
+                        if (seconds > 0) {
+                            seconds--;
+                        } else if (minutes > 0) {
+                            minutes--;
+                            seconds = 59;
+                        } else if (hours > 0) {
+                            hours--;
+                            minutes = 59;
+                            seconds = 59;
+                        } else {
+                            return { hours: 3, minutes: 24, seconds: 0 };
+                        }
+                        
+                        return { hours, minutes, seconds };
+                    });
+                }, 1000);
+
+                return () => clearInterval(timer);
+            }, []);
+
+            // Individual lottery countdowns
+            useEffect(() => {
+                const timer = setInterval(() => {
+                    setLotteryCountdowns(prev => {
+                        const updated = {};
+                        lotteries.forEach(lottery => {
+                            let { hours, minutes, seconds } = prev[lottery.id];
+                            
+                            if (seconds > 0) {
+                                seconds--;
+                            } else if (minutes > 0) {
+                                minutes--;
+                                seconds = 59;
+                            } else if (hours > 0) {
+                                hours--;
+                                minutes = 59;
+                                seconds = 59;
+                            } else {
+                                const reset = { ...lottery.initialTime };
+                                updated[lottery.id] = reset;
+                                return;
+                            }
+                            
+                            updated[lottery.id] = { hours, minutes, seconds };
+                        });
+                        return { ...prev, ...updated };
+                    });
+                }, 1000);
+
+                return () => clearInterval(timer);
+            }, []);
+
+            const formatTime = (time) => {
+                const h = String(time.hours).padStart(2, '0');
+                const m = String(time.minutes).padStart(2, '0');
+                const s = String(time.seconds).padStart(2, '0');
+                return `${h}:${m}:${s}`;
+            };
+
+            const betTypes = [
+                {
+                    id: 'single',
+                    name: 'Single Number',
+                    description: 'Will a specific number be drawn?',
+                    odds: 7.5,
+                    minBet: 0.10,
+                    maxBet: 50,
+                    popular: true
+                },
+                {
+                    id: 'even-odd',
+                    name: 'Even/Odd Majority',
+                    description: 'More even or odd numbers drawn?',
+                    odds: 1.9,
+                    minBet: 0.50,
+                    maxBet: 100,
+                    popular: true
+                },
+                {
+                    id: 'sum',
+                    name: 'Sum Over/Under',
+                    description: 'Total sum above or below threshold',
+                    odds: 1.85,
+                    minBet: 0.50,
+                    maxBet: 100
+                },
+                {
+                    id: 'cross',
+                    name: 'Cross-Country Match',
+                    description: 'Same number in multiple countries',
+                    odds: 25.0,
+                    minBet: 0.25,
+                    maxBet: 20,
+                    hot: true
+                },
+                {
+                    id: 'triple',
+                    name: 'Triple Parlay',
+                    description: 'Outcome in all three countries',
+                    odds: 50.0,
+                    minBet: 0.10,
+                    maxBet: 10,
+                    hot: true
+                },
+                {
+                    id: 'lucky',
+                    name: 'Lucky Number Special',
+                    description: 'Specific number in any draw today',
+                    odds: 4.2,
+                    minBet: 0.50,
+                    maxBet: 25,
+                    special: true
+                }
+            ];
+
+            const placeBet = (bet) => {
+                if (betAmount > balance) {
+                    alert('Insufficient balance');
+                    return;
+                }
+                
+                const newBet = {
+                    id: Date.now(),
+                    betType: bet.name,
+                    amount: betAmount,
+                    odds: bet.odds,
+                    potentialWin: betAmount * bet.odds,
+                    timestamp: new Date().toLocaleTimeString()
+                };
+                
+                setBalance(balance - betAmount);
+                setActiveBets([...activeBets, newBet]);
+                setSelectedBet(null);
+                setBetAmount(1.00);
+            };
+
+            const cancelBet = (betId) => {
+                const bet = activeBets.find(b => b.id === betId);
+                setBalance(balance + bet.amount);
+                setActiveBets(activeBets.filter(b => b.id !== betId));
+            };
+
+            return (
+                <div className="min-h-screen bg-[#0a0a0f]">
+                    {/* Navigation */}
+                    <nav className="border-b border-white/5 backdrop-blur-xl">
+                        <div className="max-w-7xl mx-auto px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-12">
+                                    <div className="text-xl font-serif">CryptoLotto</div>
+                                    <div className="hidden md:flex items-center gap-8 text-sm text-gray-400">
+                                        <a href="#" className="hover:text-white transition">Platform</a>
+                                        <a href="#" className="hover:text-white transition">Markets</a>
+                                        <a href="#" className="hover:text-white transition">Documentation</a>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-sm text-gray-400">${balance.toFixed(2)} USDC</div>
+                                    <button className="px-6 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition">
+                                        Connect Wallet
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* Hero */}
+                    <div className="relative overflow-hidden">
+                        <div className="glow-purple"></div>
+                        <div className="glow-blue"></div>
+                        
+                        <div className="relative max-w-7xl mx-auto px-6 py-24 text-center z-10">
+                            <h1 className="text-6xl md:text-7xl font-serif mb-6 leading-tight">
+                                Blockchain lottery betting
+                                <br />
+                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                                    for the decentralized era
+                                </span>
+                            </h1>
+                            
+                            <p className="text-xl text-gray-400 mb-12 max-w-2xl mx-auto">
+                                Verifiable draws. Instant settlement. Global access.
+                                <br />
+                                Built on the most advanced blockchain protocol.
+                            </p>
+                            
+                            <div className="flex items-center justify-center gap-4">
+                                <button className="px-8 py-3 bg-white text-black rounded-lg font-medium hover:bg-gray-100 transition">
+                                    Start Betting →
+                                </button>
+                                <button className="px-8 py-3 border border-white/10 rounded-lg hover:bg-white/5 transition">
+                                    Documentation
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="border-y border-white/5 bg-black/20 backdrop-blur">
+                        <div className="max-w-7xl mx-auto px-6 py-6">
+                            <div className="grid grid-cols-4 gap-8">
+                                <div>
+                                    <div className="text-sm text-gray-500 mb-1">Total Volume</div>
+                                    <div className="text-2xl font-light">$847.2M</div>
+                                </div>
+                                <div>
+                                    <div className="text-sm text-gray-500 mb-1">Active Bets</div>
+                                    <div className="text-2xl font-light">{activeBets.length}</div>
+                                </div>
+                                <div>
+                                    <div className="text-sm text-gray-500 mb-1">Potential Win</div>
+                                    <div className="text-2xl font-light text-green-400">
+                                        ${activeBets.reduce((sum, bet) => sum + bet.potentialWin, 0).toFixed(2)}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-sm text-gray-500 mb-1">Next Draw</div>
+                                    <div className="text-2xl font-light font-mono">{formatTime(countdown)}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Content with gradient background */}
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-900/10 to-transparent pointer-events-none"></div>
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-transparent to-blue-600/5 pointer-events-none"></div>
+                        
+                        <div className="relative max-w-7xl mx-auto px-6 py-16">
+                            {/* Lotteries */}
+                            <div className="mb-20">
+                                <div className="mb-8">
+                                    <div className="text-sm text-gray-500 mb-2">01 // MARKETS</div>
+                                    <h2 className="text-3xl font-light">Live Draws</h2>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-6">
+                                    {lotteries.map((lottery) => (
+                                        <div key={lottery.id} className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-purple-500/30 transition-all cursor-pointer group">
+                                            <div className="flex items-start gap-3 mb-6">
+                                                <span className="text-4xl">{lottery.flag}</span>
+                                                <div>
+                                                    <div className="text-2xl font-light mb-1">{lottery.name}</div>
+                                                    <div className="text-sm text-gray-500">{lottery.frequency}</div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-gray-500">Next Draw</span>
+                                                    <span className="font-medium font-mono text-lg text-purple-300">
+                                                        {formatTime(lotteryCountdowns[lottery.id])}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-gray-500">Jackpot</span>
+                                                    <span className="font-medium text-green-400">{lottery.jackpot}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Bets */}
+                            <div className="mb-20">
+                                <div className="mb-8">
+                                    <div className="text-sm text-gray-500 mb-2">02 // BETTING</div>
+                                    <h2 className="text-3xl font-light">Available Markets</h2>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-6">
+                                    {betTypes.map((bet) => (
+                                        <div key={bet.id} className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 hover:bg-white/10 transition-all group">
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <h3 className="text-xl font-light">{bet.name}</h3>
+                                                        {bet.popular && (
+                                                            <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded text-xs">Popular</span>
+                                                        )}
+                                                        {bet.hot && (
+                                                            <span className="px-2 py-1 bg-orange-500/10 text-orange-400 rounded text-xs">Hot</span>
+                                                        )}
+                                                        {bet.special && (
+                                                            <span className="px-2 py-1 bg-purple-500/10 text-purple-400 rounded text-xs">Special</span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-sm text-gray-500">{bet.description}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                                                <div className="flex items-center gap-6">
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Odds</div>
+                                                        <div className="text-lg font-medium text-green-400">{bet.odds}×</div>
+                                                    </div>
+                                                    <div className="w-px h-8 bg-white/10"></div>
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 mb-1">Range</div>
+                                                        <div className="text-sm">${bet.minBet} - ${bet.maxBet}</div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <button 
+                                                    onClick={() => setSelectedBet(bet)}
+                                                    className="px-6 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition"
+                                                >
+                                                    Place Bet
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Active Bets */}
+                            {activeBets.length > 0 && (
+                                <div>
+                                    <div className="mb-8">
+                                        <div className="text-sm text-gray-500 mb-2">03 // PORTFOLIO</div>
+                                        <h2 className="text-3xl font-light">Active Positions</h2>
+                                    </div>
+
+                                    <div className="bg-white/5 border border-white/10 rounded-2xl divide-y divide-white/10">
+                                        {activeBets.map((bet) => (
+                                            <div key={bet.id} className="p-6 flex items-center justify-between hover:bg-white/5 transition">
+                                                <div className="flex-1">
+                                                    <div className="font-medium mb-1">{bet.betType}</div>
+                                                    <div className="text-sm text-gray-500">{bet.timestamp}</div>
+                                                </div>
+                                                <div className="flex items-center gap-8">
+                                                    <div className="text-right">
+                                                        <div className="text-xs text-gray-500 mb-1">Stake</div>
+                                                        <div className="font-medium">${bet.amount.toFixed(2)}</div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-xs text-gray-500 mb-1">Odds</div>
+                                                        <div className="font-medium">{bet.odds}×</div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-xs text-gray-500 mb-1">Potential</div>
+                                                        <div className="font-medium text-green-400">${bet.potentialWin.toFixed(2)}</div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => cancelBet(bet.id)}
+                                                        className="px-4 py-2 text-red-400 hover:bg-red-500/10 rounded-lg text-sm transition"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Modal */}
+                    {selectedBet && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                            <div className="bg-[#0a0a0f] border border-white/10 rounded-2xl p-8 max-w-md w-full">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-2xl font-light">{selectedBet.name}</h3>
+                                    <button 
+                                        onClick={() => setSelectedBet(null)}
+                                        className="text-gray-400 hover:text-white text-2xl"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                                
+                                <p className="text-gray-400 text-sm mb-8">{selectedBet.description}</p>
+                                
+                                <div className="space-y-6 mb-8">
+                                    <div>
+                                        <label className="block text-sm text-gray-500 mb-2">Amount (USDC)</label>
+                                        <input 
+                                            type="number"
+                                            value={betAmount}
+                                            onChange={(e) => setBetAmount(parseFloat(e.target.value))}
+                                            min={selectedBet.minBet}
+                                            max={Math.min(selectedBet.maxBet, balance)}
+                                            step="0.10"
+                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white"
+                                        />
+                                    </div>
+                                    
+                                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4 space-y-2">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-400">Odds</span>
+                                            <span className="font-medium text-green-400">{selectedBet.odds}×</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-400">Potential Win</span>
+                                            <span className="font-medium text-lg text-green-400">
+                                                ${(betAmount * selectedBet.odds).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <button 
+                                    onClick={() => placeBet(selectedBet)}
+                                    className="w-full py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition"
+                                >
+                                    Confirm Bet
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Footer */}
+                    <footer className="border-t border-white/5 mt-20">
+                        <div className="max-w-7xl mx-auto px-6 py-8">
+                            <div className="flex items-center justify-between text-sm text-gray-500">
+                                <div>Built on Ethereum L2 • Powered by Chainlink</div>
+                                <div>CryptoLotto © 2026</div>
+                            </div>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('app'));
+        root.render(<CryptoLotto />);
+    </script>
+</body>
+</html>
